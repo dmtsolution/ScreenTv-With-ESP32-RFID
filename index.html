@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LabTV - Gestion des Salles et Connexions TV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        #sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        @media (max-width: 768px) {
+            #sidebar {
+                transform: translateX(-100%);
+            }
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+        .hamburger {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            z-index: 60;
+        }
+        .hamburger span {
+            width: 24px;
+            height: 3px;
+            background: #1f2937;
+            margin: 2.5px 0;
+            transition: all 0.3s ease;
+        }
+        .hamburger.open span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+        .hamburger.open span:nth-child(2) {
+            opacity: 0;
+        }
+        .hamburger.open span:nth-child(3) {
+            transform: rotate(-45deg) translate(8px, -8px);
+        }
+        .menu-item {
+            cursor: pointer;
+        }
+        .menu-item.active {
+            background: #4b5563;
+            border-left: 4px solid #3b82f6;
+        }
+        .section {
+            transition: opacity 0.3s ease;
+        }
+        .section.hidden {
+            display: none;
+        }
+        .btn {
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Sidebar -->
+    <div id="sidebar" class="fixed inset-y-0 left-0 bg-gray-800 text-white w-64 z-50">
+        <div class="p-6">
+            <h1 class="text-2xl font-bold text-center">LabTV</h1>
+            <p class="text-sm text-center text-gray-400 mt-2">Gestion des salles</p>
+        </div>
+        <nav class="mt-6">
+            <button id="menu-add" class="menu-item w-full text-left py-3 px-6 hover:bg-gray-700 transition">
+                + Ajouter une salle
+            </button>
+            <button id="menu-list" class="menu-item w-full text-left py-3 px-6 hover:bg-gray-700 transition">
+                Liste des salles
+            </button>
+            <button id="menu-history" class="menu-item w-full text-left py-3 px-6 hover:bg-gray-700 transition">
+                Historique
+            </button>
+        </nav>
+    </div>
+
+    <!-- Modal de confirmation -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Confirmer la suppression</h3>
+            <p class="text-gray-600 mb-6">Voulez-vous vraiment supprimer cette salle ? Cette action est irreversible.</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400 transition">
+                    Annuler
+                </button>
+                <button id="confirmDeleteBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">
+                    Supprimer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bouton Hamburger mobile -->
+    <div id="hamburger" class="md:hidden fixed top-4 left-4 z-50 hamburger">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+
+    <!-- Contenu principal -->
+    <div class="md:ml-64 p-6">
+        <!-- Section Ajout -->
+        <div id="addSection" class="section">
+            <h2 class="text-3xl font-bold mb-6">Ajouter une salle</h2>
+            <div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Nom de la salle</label>
+                    <input type="text" id="nomSalle" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Salle 101">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Nom de la TV</label>
+                    <input type="text" id="nomTv" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: SfcTv">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">UID du badge RFID</label>
+                    <input type="text" id="uidBadge" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 63 3B 92 AA">
+                    <p class="text-sm text-gray-500 mt-1">Passez le badge sur le lecteur pour obtenir son UID</p>
+                </div>
+                <button onclick="ajouterSalle()" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition btn">
+                    Enregistrer la salle
+                </button>
+            </div>
+        </div>
+
+        <!-- Section Liste -->
+        <div id="listSection" class="section hidden">
+            <h2 class="text-3xl font-bold mb-6">Liste des salles</h2>
+            <button onclick="chargerSalles()" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 transition mb-4">
+                Rafraichir
+            </button>
+            <div class="bg-white rounded-lg shadow overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="py-3 px-4 text-left">ID</th>
+                            <th class="py-3 px-4 text-left">Salle</th>
+                            <th class="py-3 px-4 text-left">TV</th>
+                            <th class="py-3 px-4 text-left">UID Badge</th>
+                            <th class="py-3 px-4 text-left">Date creation</th>
+                            <th class="py-3 px-4 text-left">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sallesTable">
+                        <tr>
+                            <td colspan="6" class="py-4 text-center text-gray-500">Chargement...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section Historique -->
+        <div id="historySection" class="section hidden">
+            <h2 class="text-3xl font-bold mb-6">Historique des connexions</h2>
+            <button onclick="chargerHistorique()" class="bg-teal-500 text-white px-6 py-2 rounded-lg hover:bg-teal-600 transition mb-4">
+                Rafraichir
+            </button>
+            <div class="bg-white rounded-lg shadow overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="py-3 px-4 text-left">Salle</th>
+                            <th class="py-3 px-4 text-left">TV</th>
+                            <th class="py-3 px-4 text-left">Date connexion</th>
+                            <th class="py-3 px-4 text-left">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable">
+                        <tr>
+                            <td colspan="4" class="py-4 text-center text-gray-500">Chargement...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Journal -->
+        <div class="mt-8">
+            <h3 class="text-xl font-bold mb-4">Journal des evenements</h3>
+            <div id="logContainer" class="bg-white rounded-lg shadow p-4 max-h-64 overflow-y-auto">
+                <ul id="logList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = 'http://localhost:8000/api';
+        let currentDeleteId = null;
+
+        function ajouterMessage(msg, type) {
+            const logList = document.getElementById('logList');
+            const li = document.createElement('li');
+            const timestamp = new Date().toLocaleTimeString();
+            li.className = `fade-in py-1 ${type === 'error' ? 'text-red-600' : 'text-green-600'}`;
+            li.innerHTML = `[${timestamp}] ${msg}`;
+            logList.insertBefore(li, logList.firstChild);
+        }
+
+        function openModal(id) {
+            currentDeleteId = id;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            currentDeleteId = null;
+        }
+
+        async function ajouterSalle() {
+            const nomSalle = document.getElementById('nomSalle').value.trim();
+            const nomTv = document.getElementById('nomTv').value.trim();
+            const uidBadge = document.getElementById('uidBadge').value.trim();
+
+            if (!nomSalle || !nomTv || !uidBadge) {
+                ajouterMessage('Veuillez remplir tous les champs', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBase}/salles.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nom_salle: nomSalle, nom_tv: nomTv, uid_badge: uidBadge })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    ajouterMessage(`Salle "${nomSalle}" ajoutee avec succes (ID: ${data.id})`, 'success');
+                    document.getElementById('nomSalle').value = '';
+                    document.getElementById('nomTv').value = '';
+                    document.getElementById('uidBadge').value = '';
+                    chargerSalles();
+                } else {
+                    ajouterMessage(`Erreur: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                ajouterMessage(`Erreur reseau: ${error.message}`, 'error');
+            }
+        }
+
+        async function chargerSalles() {
+            try {
+                const response = await fetch(`${apiBase}/salles.php`);
+                const salles = await response.json();
+                const tbody = document.getElementById('sallesTable');
+                
+                if (salles.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-500">Aucune salle enregistree</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = salles.map(salle => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4">${salle.id}</td>
+                        <td class="py-3 px-4">${salle.nom_salle}</td>
+                        <td class="py-3 px-4">${salle.nom_tv}</td>
+                        <td class="py-3 px-4 font-mono text-sm">${salle.uid_badge}</td>
+                        <td class="py-3 px-4">${salle.date_creation}</td>
+                        <td class="py-3 px-4">
+                            <button onclick="openModal(${salle.id})" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">
+                                Supprimer
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                ajouterMessage(`${salles.length} salle(s) chargee(s)`, 'success');
+            } catch (error) {
+                ajouterMessage(`Erreur chargement salles: ${error.message}`, 'error');
+            }
+        }
+
+        async function supprimerSalle(id) {
+            try {
+                const response = await fetch(`${apiBase}/salles.php?id=${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    ajouterMessage(`Salle ID ${id} supprimee`, 'success');
+                    chargerSalles();
+                } else {
+                    ajouterMessage(`Erreur suppression: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                ajouterMessage(`Erreur reseau: ${error.message}`, 'error');
+            }
+        }
+
+        async function chargerHistorique() {
+            try {
+                const response = await fetch(`${apiBase}/historique.php`);
+                const historique = await response.json();
+                const tbody = document.getElementById('historyTable');
+                
+                if (historique.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-500">Aucune connexion enregistree</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = historique.map(entry => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4">${entry.nom_salle}</td>
+                        <td class="py-3 px-4">${entry.nom_tv}</td>
+                        <td class="py-3 px-4">${entry.date_connexion}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded text-xs ${entry.statut === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${entry.statut === 'success' ? 'Succes' : 'Echec'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                ajouterMessage(`${historique.length} connexion(s) chargee(s)`, 'success');
+            } catch (error) {
+                ajouterMessage(`Erreur chargement historique: ${error.message}`, 'error');
+            }
+        }
+
+        // Navigation
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`${section}Section`).classList.remove('hidden');
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            document.getElementById(`menu-${section}`).classList.add('active');
+            
+            if (section === 'list') chargerSalles();
+            if (section === 'history') chargerHistorique();
+        }
+
+        // Evenements
+        document.getElementById('menu-add').onclick = () => showSection('add');
+        document.getElementById('menu-list').onclick = () => showSection('list');
+        document.getElementById('menu-history').onclick = () => showSection('history');
+        document.getElementById('confirmDeleteBtn').onclick = () => {
+            if (currentDeleteId) {
+                supprimerSalle(currentDeleteId);
+                closeModal();
+            }
+        };
+        
+        document.getElementById('hamburger').onclick = () => {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('hamburger').classList.toggle('open');
+        };
+
+        // Fermer la modale en cliquant sur l'overlay
+        document.getElementById('deleteModal').onclick = (e) => {
+            if (e.target === document.getElementById('deleteModal')) {
+                closeModal();
+            }
+        };
+
+        // Initialisation
+        showSection('add');
+        ajouterMessage('Application LabTV demarree', 'success');
+    </script>
+</body>
+</html>

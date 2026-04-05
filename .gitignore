@@ -1,0 +1,22 @@
+# LabTV - Gitignore simplifie
+
+# Environnement Python
+venv/
+__pycache__/
+*.pyc
+
+# Dependances PHP
+vendor/
+composer.phar
+
+# Configuration locale
+ip_config.txt
+.install_done
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
