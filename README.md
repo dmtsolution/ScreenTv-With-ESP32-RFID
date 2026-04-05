@@ -99,8 +99,8 @@ CONFIGURATION DE L'ESP32
 1) Ouvrir arduino/ESP32_ConnectTV.ino dans Arduino IDE
 
 2) Modifier le WiFi si necessaire :
-   const char* ssid = "ADMINISTRATION";
-   const char* password = "@dm1n@LAN22";
+   const char* ssid = "ssidici";
+   const char* password = "motdepasseici";
 
 3) Modifier l'IP du serveur PHP :
    const char* serverUrl = "http://IP_DU_PC:8000/api/badge.php";
